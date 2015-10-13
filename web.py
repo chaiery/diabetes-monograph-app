@@ -6,6 +6,7 @@ import snps
 import freq
 import ga4gh
 import config
+import requests
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
@@ -14,6 +15,20 @@ SNP_TRANSLATION_FNAME = 'snps.sorted.txt.gz'
 YEAR = 31536000
 GENOTYPES = {snp: snp_data['Code'] for snp, snp_data in snps.DATA.iteritems()} 
 
+def call_api(url, args={}):
+    # who even uses xml..
+    args['_format'] = 'json'
+    resp = requests.get(
+                        '%s%s?%s'% (config.GENOMICS['api_base'], url, urlencode(args)),
+                        headers={'Authorization': 'Bearer %s'% session['access_token']})
+    return resp.json()
+
+def call_api2(url, **args):
+    # who even uses xml..
+    
+    resp = requests.get(
+                        '%s%s?%s'% (config.GENOMICS['api_base'], url, urlencode(args)))
+    return resp.json()
 
 def cache(max_age):
     def decorator(view_func):
@@ -106,15 +121,25 @@ def get_frequencies():
 
 
 @app.route('/callsets')
-def get_callsets(): 
-    vset_search = ga4gh.search('variantsets', datasetIds=[ga4gh.OKG], repo_id='google') 
+def get_callsets():
+    vset_search = call_api2('/variantsets',datasetIds=[ga4gh.OKG])
+    #vset_search = ga4gh.search('variantsets', datasetIds=[ga4gh.OKG], repo_id='google')
     vset_id = vset_search['variantSets'][0]['id']
+    
+    callset_search = call_api2(
+                                  '/callsets',
+                                  variantSetIds=[vset_id],
+                                  pageSize=10,
+                                  **request.args)
+    
+    '''
     callset_search = ga4gh.search(
             'callsets',
             variantSetIds=[vset_id],
             repo_id='google',
             pageSize=10,
             **request.args)
+    '''
     return jsonify(callset_search)
 
 
